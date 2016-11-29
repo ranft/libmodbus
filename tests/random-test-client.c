@@ -54,7 +54,7 @@ int main(void)
     ctx = modbus_new_rtu("/dev/ttyUSB0", 19200, 'N', 8, 1);
     modbus_set_slave(ctx, SERVER_ID);
 */
-
+    const int slave_address = MODBUS_TCP_SLAVE;
     /* TCP */
     ctx = modbus_new_tcp("127.0.0.1", 1502);
     modbus_set_debug(ctx, TRUE);
@@ -98,13 +98,13 @@ int main(void)
             nb = ADDRESS_END - addr;
 
             /* WRITE BIT */
-            rc = modbus_write_bit(ctx, addr, tab_rq_bits[0]);
+            rc = modbus_write_bit(ctx, slave_address, addr, tab_rq_bits[0]);
             if (rc != 1) {
                 printf("ERROR modbus_write_bit (%d)\n", rc);
                 printf("Address = %d, value = %d\n", addr, tab_rq_bits[0]);
                 nb_fail++;
             } else {
-                rc = modbus_read_bits(ctx, addr, 1, tab_rp_bits);
+                rc = modbus_read_bits(ctx, slave_address, addr, 1, tab_rp_bits);
                 if (rc != 1 || tab_rq_bits[0] != tab_rp_bits[0]) {
                     printf("ERROR modbus_read_bits single (%d)\n", rc);
                     printf("address = %d\n", addr);
@@ -113,13 +113,13 @@ int main(void)
             }
 
             /* MULTIPLE BITS */
-            rc = modbus_write_bits(ctx, addr, nb, tab_rq_bits);
+            rc = modbus_write_bits(ctx, slave_address, addr, nb, tab_rq_bits);
             if (rc != nb) {
                 printf("ERROR modbus_write_bits (%d)\n", rc);
                 printf("Address = %d, nb = %d\n", addr, nb);
                 nb_fail++;
             } else {
-                rc = modbus_read_bits(ctx, addr, nb, tab_rp_bits);
+                rc = modbus_read_bits(ctx, slave_address, addr, nb, tab_rp_bits);
                 if (rc != nb) {
                     printf("ERROR modbus_read_bits\n");
                     printf("Address = %d, nb = %d\n", addr, nb);
@@ -138,14 +138,16 @@ int main(void)
             }
 
             /* SINGLE REGISTER */
-            rc = modbus_write_register(ctx, addr, tab_rq_registers[0]);
+            rc = modbus_write_register(ctx, slave_address, addr,
+                                       tab_rq_registers[0]);
             if (rc != 1) {
                 printf("ERROR modbus_write_register (%d)\n", rc);
                 printf("Address = %d, value = %d (0x%X)\n",
                        addr, tab_rq_registers[0], tab_rq_registers[0]);
                 nb_fail++;
             } else {
-                rc = modbus_read_registers(ctx, addr, 1, tab_rp_registers);
+                rc = modbus_read_registers(ctx, slave_address, addr, 1,
+                                           tab_rp_registers);
                 if (rc != 1) {
                     printf("ERROR modbus_read_registers single (%d)\n", rc);
                     printf("Address = %d\n", addr);
@@ -162,13 +164,15 @@ int main(void)
             }
 
             /* MULTIPLE REGISTERS */
-            rc = modbus_write_registers(ctx, addr, nb, tab_rq_registers);
+            rc = modbus_write_registers(ctx, slave_address, addr, nb,
+                                        tab_rq_registers);
             if (rc != nb) {
                 printf("ERROR modbus_write_registers (%d)\n", rc);
                 printf("Address = %d, nb = %d\n", addr, nb);
                 nb_fail++;
             } else {
-                rc = modbus_read_registers(ctx, addr, nb, tab_rp_registers);
+                rc = modbus_read_registers(ctx, slave_address, addr, nb,
+                                           tab_rp_registers);
                 if (rc != nb) {
                     printf("ERROR modbus_read_registers (%d)\n", rc);
                     printf("Address = %d, nb = %d\n", addr, nb);
@@ -187,6 +191,7 @@ int main(void)
             }
             /* R/W MULTIPLE REGISTERS */
             rc = modbus_write_and_read_registers(ctx,
+                                                 slave_address,
                                                  addr, nb, tab_rw_rq_registers,
                                                  addr, nb, tab_rp_registers);
             if (rc != nb) {
@@ -204,7 +209,8 @@ int main(void)
                     }
                 }
 
-                rc = modbus_read_registers(ctx, addr, nb, tab_rp_registers);
+                rc = modbus_read_registers(ctx, slave_address, addr, nb,
+                                           tab_rp_registers);
                 if (rc != nb) {
                     printf("ERROR modbus_read_registers (%d)\n", rc);
                     printf("Address = %d, nb = %d\n", addr, nb);

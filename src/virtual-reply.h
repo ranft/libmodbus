@@ -1,5 +1,5 @@
 /*
- * Copyright © 2001-2013 Rüdiger Ranft <libmodbus@qzzq.de>
+ * Copyright © 2016 Rüdiger Ranft <libmodbus@qzzq.de>
  *
  * SPDX-License-Identifier: LGPL-2.1+
  */
@@ -19,25 +19,25 @@ typedef enum {
 
 typedef struct {
     void* app;
-    uint8_t*  (*tab_bits)(void* app, int addr, int nb,
+    uint8_t*  (*tab_bits)(void* app, int device, int addr, int nb,
                           modbus_vmap_reason what);
-    void (*tab_bits_done)(void* app, uint8_t* store, int addr, int nb,
+    void (*tab_bits_done)(void* app, uint8_t* store, int device, int addr, int nb,
                           modbus_vmap_reason what);
 
-    uint8_t*  (*tab_input_bits)(void* app, int addr, int nb,
+    uint8_t*  (*tab_input_bits)(void* app, int device, int addr, int nb,
                                 modbus_vmap_reason what);
-    void (*tab_input_bits_done)(void* app, uint8_t* store, int addr, int nb,
+    void (*tab_input_bits_done)(void* app, uint8_t* store, int device, int addr, int nb,
                                 modbus_vmap_reason what);
 
-    uint16_t* (*tab_input_registers)(void* app, int addr, int nb,
+    uint16_t* (*tab_input_registers)(void* app, int device, int addr, int nb,
                                      modbus_vmap_reason what);
-    void (*tab_input_registers_done)(void* app, uint16_t*store, int addr,
+    void (*tab_input_registers_done)(void* app, uint16_t*store, int device, int addr,
                                      int nb, modbus_vmap_reason what);
 
 
-    uint16_t* (*tab_registers)(void* app, int addr, int nb,
+    uint16_t* (*tab_registers)(void* app, int device, int addr, int nb,
                                modbus_vmap_reason what);
-    void (*tab_registers_done)(void* app, uint16_t* store, int addr, int nb,
+    void (*tab_registers_done)(void* app, uint16_t* store, int device, int addr, int nb,
                                modbus_vmap_reason what);
 } modbus_vmapping_t;
 

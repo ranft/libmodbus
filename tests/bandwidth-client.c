@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
         n_loop = 100000;
     }
 
+    const int slave_address = use_backend == TCP ? MODBUS_TCP_SLAVE: 1;
     if (use_backend == TCP) {
         ctx = modbus_new_tcp("127.0.0.1", 1502);
     } else {
@@ -94,7 +95,7 @@ int main(int argc, char *argv[])
     nb_points = MODBUS_MAX_READ_BITS;
     start = gettime_ms();
     for (i=0; i<n_loop; i++) {
-        rc = modbus_read_bits(ctx, 0, nb_points, tab_bit);
+        rc = modbus_read_bits(ctx, slave_address, 0, nb_points, tab_bit);
         if (rc == -1) {
             fprintf(stderr, "%s\n", modbus_strerror(errno));
             return -1;
@@ -131,7 +132,7 @@ int main(int argc, char *argv[])
     nb_points = MODBUS_MAX_READ_REGISTERS;
     start = gettime_ms();
     for (i=0; i<n_loop; i++) {
-        rc = modbus_read_registers(ctx, 0, nb_points, tab_reg);
+        rc = modbus_read_registers(ctx, slave_address, 0, nb_points, tab_reg);
         if (rc == -1) {
             fprintf(stderr, "%s\n", modbus_strerror(errno));
             return -1;
@@ -168,7 +169,7 @@ int main(int argc, char *argv[])
     nb_points = MODBUS_MAX_WR_WRITE_REGISTERS;
     start = gettime_ms();
     for (i=0; i<n_loop; i++) {
-        rc = modbus_write_and_read_registers(ctx,
+        rc = modbus_write_and_read_registers(ctx, slave_address,
                                              0, nb_points, tab_reg,
                                              0, nb_points, tab_reg);
         if (rc == -1) {

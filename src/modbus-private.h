@@ -69,9 +69,9 @@ typedef struct _modbus_backend {
     unsigned int header_length;
     unsigned int checksum_length;
     unsigned int max_adu_length;
-    int (*set_slave) (modbus_t *ctx, int slave);
-    int (*build_request_basis) (modbus_t *ctx, int function, int addr,
-                                int nb, uint8_t *req);
+    unsigned (*valid_slave_address)(int address);
+    int (*build_request_basis) (modbus_t *ctx, int function, int slave,
+                                int addr, int nb, uint8_t *req);
     int (*build_response_basis) (sft_t *sft, uint8_t *rsp);
     int (*prepare_response_tid) (const uint8_t *req, int *req_length);
     int (*send_msg_pre) (uint8_t *req, int req_length);
@@ -91,7 +91,9 @@ typedef struct _modbus_backend {
 
 struct _modbus {
     /* Slave address */
-    int slave;
+    void* sl_app;
+    int single_slave_address; // Don't use this member directly
+    modbus_slave_callback slaves;
     /* Socket or file descriptor */
     int s;
     int debug;
@@ -105,6 +107,8 @@ struct _modbus {
 void _modbus_init_common(modbus_t *ctx);
 void _error_print(modbus_t *ctx, const char *context);
 int _modbus_receive_msg(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type);
+
+unsigned slave_is_accaptable(modbus_t *ctx, int slave);
 
 #ifndef HAVE_STRLCPY
 size_t strlcpy(char *dest, const char *src, size_t dest_size);

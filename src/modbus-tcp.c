@@ -71,26 +71,17 @@ static int _modbus_tcp_init_win32(void)
 }
 #endif
 
-static int _modbus_set_slave(modbus_t *ctx, int slave)
+static unsigned _valid_slave_address(int slave)
 {
     /* Broadcast address is 0 (MODBUS_BROADCAST_ADDRESS) */
-    if (slave >= 0 && slave <= 247) {
-        ctx->slave = slave;
-    } else if (slave == MODBUS_TCP_SLAVE) {
-        /* The special value MODBUS_TCP_SLAVE (0xFF) can be used in TCP mode to
-         * restore the default value. */
-        ctx->slave = slave;
-    } else {
-        errno = EINVAL;
-        return -1;
-    }
-
-    return 0;
+    /* The special value MODBUS_TCP_SLAVE (0xFF) can be used in TCP mode to
+     * restore the default value. */
+    return ((slave >= 0) && (slave <= 247)) || (slave == MODBUS_TCP_SLAVE);
 }
 
 /* Builds a TCP request header */
 static int _modbus_tcp_build_request_basis(modbus_t *ctx, int function,
-                                           int addr, int nb,
+                                           int slave, int addr, int nb,
                                            uint8_t *req)
 {
     modbus_tcp_t *ctx_tcp = ctx->backend_data;
@@ -110,7 +101,7 @@ static int _modbus_tcp_build_request_basis(modbus_t *ctx, int function,
     /* Length will be defined later by set_req_length_tcp at offsets 4
        and 5 */
 
-    req[6] = ctx->slave;
+    req[6] = slave;
     req[7] = function;
     req[8] = addr >> 8;
     req[9] = addr & 0x00ff;
@@ -737,7 +728,7 @@ const modbus_backend_t _modbus_tcp_backend = {
     _MODBUS_TCP_HEADER_LENGTH,
     _MODBUS_TCP_CHECKSUM_LENGTH,
     MODBUS_TCP_MAX_ADU_LENGTH,
-    _modbus_set_slave,
+    _valid_slave_address,
     _modbus_tcp_build_request_basis,
     _modbus_tcp_build_response_basis,
     _modbus_tcp_prepare_response_tid,
@@ -760,7 +751,7 @@ const modbus_backend_t _modbus_tcp_pi_backend = {
     _MODBUS_TCP_HEADER_LENGTH,
     _MODBUS_TCP_CHECKSUM_LENGTH,
     MODBUS_TCP_MAX_ADU_LENGTH,
-    _modbus_set_slave,
+    _valid_slave_address,
     _modbus_tcp_build_request_basis,
     _modbus_tcp_build_response_basis,
     _modbus_tcp_prepare_response_tid,
@@ -801,7 +792,7 @@ modbus_t* modbus_new_tcp(const char *ip, int port)
     _modbus_init_common(ctx);
 
     /* Could be changed after to reach a remote serial Modbus device */
-    ctx->slave = MODBUS_TCP_SLAVE;
+    modbus_set_slave(ctx, MODBUS_TCP_SLAVE);
 
     ctx->backend = &_modbus_tcp_backend;
 
@@ -845,7 +836,7 @@ modbus_t* modbus_new_tcp_pi(const char *node, const char *service)
     _modbus_init_common(ctx);
 
     /* Could be changed after to reach a remote serial Modbus device */
-    ctx->slave = MODBUS_TCP_SLAVE;
+    modbus_set_slave(ctx, MODBUS_TCP_SLAVE);
 
     ctx->backend = &_modbus_tcp_pi_backend;
 

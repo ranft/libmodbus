@@ -176,6 +176,11 @@ typedef enum
     MODBUS_ERROR_RECOVERY_PROTOCOL      = (1<<2)
 } modbus_error_recovery_mode;
 
+#include "virtual-reply.h"
+
+typedef unsigned(*modbus_slave_callback)(void*, int slave);
+MODBUS_API int modbus_set_slaves(modbus_t* ctx, modbus_slave_callback slaves,
+                                void* app);
 MODBUS_API int modbus_set_slave(modbus_t* ctx, int slave);
 MODBUS_API int modbus_set_error_recovery(modbus_t *ctx, modbus_error_recovery_mode error_recovery);
 MODBUS_API int modbus_set_socket(modbus_t *ctx, int s);
@@ -199,19 +204,19 @@ MODBUS_API int modbus_set_debug(modbus_t *ctx, int flag);
 
 MODBUS_API const char *modbus_strerror(int errnum);
 
-MODBUS_API int modbus_read_bits(modbus_t *ctx, int addr, int nb, uint8_t *dest);
-MODBUS_API int modbus_read_input_bits(modbus_t *ctx, int addr, int nb, uint8_t *dest);
-MODBUS_API int modbus_read_registers(modbus_t *ctx, int addr, int nb, uint16_t *dest);
-MODBUS_API int modbus_read_input_registers(modbus_t *ctx, int addr, int nb, uint16_t *dest);
-MODBUS_API int modbus_write_bit(modbus_t *ctx, int coil_addr, int status);
-MODBUS_API int modbus_write_register(modbus_t *ctx, int reg_addr, int value);
-MODBUS_API int modbus_write_bits(modbus_t *ctx, int addr, int nb, const uint8_t *data);
-MODBUS_API int modbus_write_registers(modbus_t *ctx, int addr, int nb, const uint16_t *data);
-MODBUS_API int modbus_mask_write_register(modbus_t *ctx, int addr, uint16_t and_mask, uint16_t or_mask);
-MODBUS_API int modbus_write_and_read_registers(modbus_t *ctx, int write_addr, int write_nb,
+MODBUS_API int modbus_read_bits(modbus_t *ctx, int slave, int addr, int nb, uint8_t *dest);
+MODBUS_API int modbus_read_input_bits(modbus_t *ctx, int slave, int addr, int nb, uint8_t *dest);
+MODBUS_API int modbus_read_registers(modbus_t *ctx, int slave, int addr, int nb, uint16_t *dest);
+MODBUS_API int modbus_read_input_registers(modbus_t *ctx, int slave, int addr, int nb, uint16_t *dest);
+MODBUS_API int modbus_write_bit(modbus_t *ctx, int slave, int coil_addr, int status);
+MODBUS_API int modbus_write_register(modbus_t *ctx, int slave, int reg_addr, int value);
+MODBUS_API int modbus_write_bits(modbus_t *ctx, int slave, int addr, int nb, const uint8_t *data);
+MODBUS_API int modbus_write_registers(modbus_t *ctx, int slave, int addr, int nb, const uint16_t *data);
+MODBUS_API int modbus_mask_write_register(modbus_t *ctx, int slave, int addr, uint16_t and_mask, uint16_t or_mask);
+MODBUS_API int modbus_write_and_read_registers(modbus_t *ctx, int slave, int write_addr, int write_nb,
                                                const uint16_t *src, int read_addr, int read_nb,
                                                uint16_t *dest);
-MODBUS_API int modbus_report_slave_id(modbus_t *ctx, int max_dest, uint8_t *dest);
+MODBUS_API int modbus_report_slave_id(modbus_t *ctx, int slave, int max_dest, uint8_t *dest);
 
 MODBUS_API modbus_mapping_t* modbus_mapping_new_start_address(
     unsigned int start_bits, unsigned int nb_bits,
@@ -228,8 +233,6 @@ MODBUS_API int modbus_send_raw_request(modbus_t *ctx, uint8_t *raw_req, int raw_
 MODBUS_API int modbus_receive(modbus_t *ctx, uint8_t *req);
 
 MODBUS_API int modbus_receive_confirmation(modbus_t *ctx, uint8_t *rsp);
-
-#include "virtual-reply.h"
 
 int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                  int req_length, modbus_vmapping_t *vm);

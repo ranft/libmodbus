@@ -745,17 +745,17 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
             rsp_length = response_exception(
                 ctx, &sft,
                 MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE, rsp, 1,
-                "Illegal nb of values %d in %s (max %d)\n", nb, fn_name, MODBUS_MAX_READ_BITS);
+                "Illegal nb of values %d in %s (max %d) slave %d\n", nb, fn_name, MODBUS_MAX_READ_BITS, slave);
         } else {
-            uint8_t* (*get_fn)(void*, int, int, modbus_vmap_reason)
+            uint8_t* (*get_fn)(void*, int, int, int, modbus_vmap_reason)
                 = coil? vm->tab_bits : vm->tab_input_bits;
-            void (*done_fn)(void*, uint8_t*, int, int, modbus_vmap_reason)
+            void (*done_fn)(void*, uint8_t*, int, int, int, modbus_vmap_reason)
                 = coil? vm->tab_bits_done : vm->tab_input_bits_done;
 
             if(!assure_or_set_errno(!!get_fn, EINVAL))
                 return -1;
 
-            uint8_t* data = get_fn(vm->app, address, nb, MODBUS_VMAP_READ);
+            uint8_t* data = get_fn(vm->app, slave, address, nb, MODBUS_VMAP_READ);
             if(data) {
                 rsp_length = ctx->backend->build_response_basis(&sft, rsp);
                 rsp[rsp_length++] = (nb / 8) + ((nb % 8) ? 1 : 0);
@@ -763,13 +763,13 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                                                 data,
                                                 rsp, rsp_length);
                 if(done_fn)
-                    done_fn(vm->app, data, address, nb, MODBUS_VMAP_READ);
+                    done_fn(vm->app, data, slave, address, nb, MODBUS_VMAP_READ);
             } else {
                 rsp_length = response_exception(ctx, &sft,
                     MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS, rsp, 0,
                     "Virtual mapping failed for %d Bits,"
                     " starting at address 0x%X"
-                    " for function %s\n", address, nb, fn_name);
+                    " for function %s at slave %d\n", address, nb, fn_name, slave);
             }
         }
     }
@@ -779,9 +779,9 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
         const unsigned is_input = MODBUS_FC_READ_INPUT_REGISTERS == function;
         char const*const name
             = is_input ? "read_input_registers": "read_holding_registers";
-        uint16_t* (*get_fn)(void*, int, int, modbus_vmap_reason)
+        uint16_t* (*get_fn)(void*, int, int, int, modbus_vmap_reason)
             = is_input ? vm->tab_input_registers:vm->tab_registers;
-        void (*done_fn)(void*, uint16_t*, int, int, modbus_vmap_reason)
+        void (*done_fn)(void*, uint16_t*, int, int, int, modbus_vmap_reason)
             = is_input ? vm->tab_input_registers_done: vm->tab_registers_done;
 
         const int nb = (req[offset + 3] << 8) + req[offset + 4];
@@ -796,13 +796,15 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                 "Illegal nb of values %d in %s (max %d)\n",
                 nb, name, MODBUS_MAX_READ_REGISTERS);
         } else {
-            uint16_t* source = get_fn(vm->app, address, nb, MODBUS_VMAP_READ);
+            uint16_t* source = get_fn(vm->app, slave, address, nb,
+                                      MODBUS_VMAP_READ);
             if(!source) {
                 rsp_length = response_exception(
                         ctx, &sft,
                         MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS, rsp, 0,
-                        "Illegal data address 0x%0X in read_registers\n",
-                        address);
+                        "Illegal data address 0x%0X in read_registers for "
+                        "slave %d\n",
+                        address, slave);
             } else {
                 int i;
 
@@ -813,7 +815,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                     rsp[rsp_length++] = source[i] & 0xFF;
                 }
                 if(done_fn)
-                    done_fn(vm->app, source, address, nb, MODBUS_VMAP_READ);
+                    done_fn(vm->app, source, slave, address, nb,
+                            MODBUS_VMAP_READ);
             }
         }
     }
@@ -822,7 +825,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
         if(!assure_or_set_errno(!!vm->tab_bits, EINVAL))
             return -1;
     {
-        uint8_t* dest = vm->tab_bits(vm->app, address, 1, MODBUS_VMAP_WRITE);
+        uint8_t* dest = vm->tab_bits(vm->app, slave, address, 1,
+                                     MODBUS_VMAP_WRITE);
         if(!dest) {
             rsp_length = response_exception(
                 ctx, &sft,
@@ -843,7 +847,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                     data, address);
             }
             if(vm->tab_bits_done)
-                vm->tab_bits_done(vm->app, dest, address, 1, MODBUS_VMAP_WRITE);
+                vm->tab_bits_done(vm->app, dest, slave, address, 1,
+                                  MODBUS_VMAP_WRITE);
         }
     }
         break;
@@ -851,7 +856,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
         if(!assure_or_set_errno(!!vm->tab_registers, EINVAL))
             return -1;
     {
-        uint16_t* dest = vm->tab_registers(vm->app, address, 1, MODBUS_VMAP_WRITE);
+        uint16_t* dest = vm->tab_registers(vm->app, slave, address, 1,
+                                           MODBUS_VMAP_WRITE);
         if (!dest) {
             rsp_length = response_exception(
                 ctx, &sft,
@@ -865,7 +871,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
             memcpy(rsp, req, req_length);
             rsp_length = req_length;
             if(vm->tab_registers_done)
-                vm->tab_registers_done(vm->app, dest, address, 1, MODBUS_VMAP_WRITE);
+                vm->tab_registers_done(vm->app, dest, slave, address, 1,
+                                       MODBUS_VMAP_WRITE);
         }
     }
         break;
@@ -882,7 +889,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                 "Illegal number of values %d in write_bits (max %d)\n",
                 nb, MODBUS_MAX_WRITE_BITS);
         } else {
-            uint8_t* dest = vm->tab_bits(vm->app, address, nb, MODBUS_VMAP_WRITE);
+            uint8_t* dest = vm->tab_bits(vm->app, slave, address, nb,
+                                         MODBUS_VMAP_WRITE);
             if(!dest) {
                 rsp_length = response_exception(
                     ctx, &sft,
@@ -897,7 +905,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                 memcpy(rsp + rsp_length, req + rsp_length, 4);
                 rsp_length += 4;
                 if(vm->tab_bits_done)
-                    vm->tab_bits_done(vm->app, dest, address, nb, MODBUS_VMAP_WRITE);
+                    vm->tab_bits_done(vm->app, dest, slave, address, nb,
+                                      MODBUS_VMAP_WRITE);
             }
         }
     }
@@ -915,7 +924,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                 "Illegal number of values %d in write_registers (max %d)\n",
                 nb, MODBUS_MAX_WRITE_REGISTERS);
         } else {
-            uint16_t* dest = vm->tab_registers(vm->app, address, nb, MODBUS_VMAP_WRITE);
+            uint16_t* dest = vm->tab_registers(vm->app, slave, address, nb,
+                                               MODBUS_VMAP_WRITE);
             if(!dest) {
                 rsp_length = response_exception(
                         ctx, &sft,
@@ -934,7 +944,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                 memcpy(rsp + rsp_length, req + rsp_length, 4);
                 rsp_length += 4;
                 if(vm->tab_registers_done)
-                    vm->tab_registers_done(vm->app, dest, address, nb, MODBUS_VMAP_WRITE);
+                    vm->tab_registers_done(vm->app, dest, slave, address, nb,
+                                           MODBUS_VMAP_WRITE);
             }
         }
     }
@@ -967,7 +978,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
         if(!assure_or_set_errno(!!vm->tab_registers, EINVAL))
             return -1;
     {
-        uint16_t* dest = vm->tab_registers(vm->app, address, 1, MODBUS_VMAP_WRITE);
+        uint16_t* dest = vm->tab_registers(vm->app, slave, address, 1,
+                                           MODBUS_VMAP_WRITE);
         if (!dest) {
             rsp_length = response_exception(
                 ctx, &sft,
@@ -984,7 +996,8 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
             memcpy(rsp, req, req_length);
             rsp_length = req_length;
             if(vm->tab_registers_done)
-                vm->tab_registers_done(vm->app, dest, address, 1, MODBUS_VMAP_WRITE);
+                vm->tab_registers_done(vm->app, dest, slave, address, 1,
+                                       MODBUS_VMAP_WRITE);
         }
     }
         break;
@@ -1007,9 +1020,9 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                 nb_write, nb,
                 MODBUS_MAX_WR_WRITE_REGISTERS, MODBUS_MAX_WR_READ_REGISTERS);
         } else {
-            uint16_t* read = vm->tab_registers(vm->app, address, nb,
+            uint16_t* read = vm->tab_registers(vm->app, slave, address, nb,
                                                MODBUS_VMAP_READ);
-            uint16_t* write = vm->tab_registers(vm->app, address_write,
+            uint16_t* write = vm->tab_registers(vm->app, slave, address_write,
                                                 nb_write, MODBUS_VMAP_WRITE);
             if(!(read && write)) {
                 rsp_length = response_exception(ctx, &sft,
@@ -1035,9 +1048,9 @@ int modbus_virt_reply(modbus_t *ctx, const uint8_t *req,
                     rsp[rsp_length++] = to_send & 0xFF;
                 }
                 if(vm->tab_registers_done) {
-                    vm->tab_registers_done(vm->app, read, address, nb,
+                    vm->tab_registers_done(vm->app, read, slave, address, nb,
                                            MODBUS_VMAP_READ);
-                    vm->tab_registers_done(vm->app, write, address, nb,
+                    vm->tab_registers_done(vm->app, write, slave, address, nb,
                                            MODBUS_VMAP_WRITE);
                 }
             }
@@ -1101,7 +1114,7 @@ int modbus_reply_exception(modbus_t *ctx, const uint8_t *req,
 }
 
 /* Reads IO status */
-static int read_io_status(modbus_t *ctx, int function,
+static int read_io_status(modbus_t *ctx, int function, int slave,
                           int addr, int nb, uint8_t *dest)
 {
     int rc;
@@ -1110,7 +1123,8 @@ static int read_io_status(modbus_t *ctx, int function,
     uint8_t req[_MIN_REQ_LENGTH];
     uint8_t rsp[MAX_MESSAGE_LENGTH];
 
-    req_length = ctx->backend->build_request_basis(ctx, function, addr, nb, req);
+    req_length = ctx->backend->build_request_basis(ctx, function, slave, addr,
+                                                   nb, req);
 
     rc = send_msg(ctx, req, req_length);
     if (rc > 0) {
@@ -1146,7 +1160,7 @@ static int read_io_status(modbus_t *ctx, int function,
 
 /* Reads the boolean status of bits and sets the array elements
    in the destination to TRUE or FALSE (single bits). */
-int modbus_read_bits(modbus_t *ctx, int addr, int nb, uint8_t *dest)
+int modbus_read_bits(modbus_t *ctx, int slave, int addr, int nb, uint8_t *dest)
 {
     int rc;
 
@@ -1165,7 +1179,7 @@ int modbus_read_bits(modbus_t *ctx, int addr, int nb, uint8_t *dest)
         return -1;
     }
 
-    rc = read_io_status(ctx, MODBUS_FC_READ_COILS, addr, nb, dest);
+    rc = read_io_status(ctx, MODBUS_FC_READ_COILS, slave, addr, nb, dest);
 
     if (rc == -1)
         return -1;
@@ -1175,7 +1189,8 @@ int modbus_read_bits(modbus_t *ctx, int addr, int nb, uint8_t *dest)
 
 
 /* Same as modbus_read_bits but reads the remote device input table */
-int modbus_read_input_bits(modbus_t *ctx, int addr, int nb, uint8_t *dest)
+int modbus_read_input_bits(modbus_t *ctx, int slave, int addr, int nb,
+                           uint8_t *dest)
 {
     int rc;
 
@@ -1194,7 +1209,8 @@ int modbus_read_input_bits(modbus_t *ctx, int addr, int nb, uint8_t *dest)
         return -1;
     }
 
-    rc = read_io_status(ctx, MODBUS_FC_READ_DISCRETE_INPUTS, addr, nb, dest);
+    rc = read_io_status(ctx, MODBUS_FC_READ_DISCRETE_INPUTS, slave, addr, nb,
+                        dest);
 
     if (rc == -1)
         return -1;
@@ -1203,8 +1219,8 @@ int modbus_read_input_bits(modbus_t *ctx, int addr, int nb, uint8_t *dest)
 }
 
 /* Reads the data from a remove device and put that data into an array */
-static int read_registers(modbus_t *ctx, int function, int addr, int nb,
-                          uint16_t *dest)
+static int read_registers(modbus_t *ctx, int function, int slave, int addr,
+                          int nb, uint16_t *dest)
 {
     int rc;
     int req_length;
@@ -1221,7 +1237,8 @@ static int read_registers(modbus_t *ctx, int function, int addr, int nb,
         return -1;
     }
 
-    req_length = ctx->backend->build_request_basis(ctx, function, addr, nb, req);
+    req_length = ctx->backend->build_request_basis(ctx, function, slave, addr,
+                                                   nb, req);
 
     rc = send_msg(ctx, req, req_length);
     if (rc > 0) {
@@ -1250,7 +1267,8 @@ static int read_registers(modbus_t *ctx, int function, int addr, int nb,
 
 /* Reads the holding registers of remote device and put the data into an
    array */
-int modbus_read_registers(modbus_t *ctx, int addr, int nb, uint16_t *dest)
+int modbus_read_registers(modbus_t *ctx, int slave, int addr, int nb,
+                          uint16_t *dest)
 {
     int status;
 
@@ -1270,12 +1288,12 @@ int modbus_read_registers(modbus_t *ctx, int addr, int nb, uint16_t *dest)
     }
 
     status = read_registers(ctx, MODBUS_FC_READ_HOLDING_REGISTERS,
-                            addr, nb, dest);
+                            slave, addr, nb, dest);
     return status;
 }
 
 /* Reads the input registers of remote device and put the data into an array */
-int modbus_read_input_registers(modbus_t *ctx, int addr, int nb,
+int modbus_read_input_registers(modbus_t *ctx, int slave, int addr, int nb,
                                 uint16_t *dest)
 {
     int status;
@@ -1294,14 +1312,15 @@ int modbus_read_input_registers(modbus_t *ctx, int addr, int nb,
     }
 
     status = read_registers(ctx, MODBUS_FC_READ_INPUT_REGISTERS,
-                            addr, nb, dest);
+                            slave, addr, nb, dest);
 
     return status;
 }
 
 /* Write a value to the specified register of the remote device.
    Used by write_bit and write_register */
-static int write_single(modbus_t *ctx, int function, int addr, int value)
+static int write_single(modbus_t *ctx, int function, int slave, int addr,
+                        int value)
 {
     int rc;
     int req_length;
@@ -1312,7 +1331,8 @@ static int write_single(modbus_t *ctx, int function, int addr, int value)
         return -1;
     }
 
-    req_length = ctx->backend->build_request_basis(ctx, function, addr, value, req);
+    req_length = ctx->backend->build_request_basis(ctx, function, slave, addr,
+                                                   value, req);
 
     rc = send_msg(ctx, req, req_length);
     if (rc > 0) {
@@ -1330,30 +1350,31 @@ static int write_single(modbus_t *ctx, int function, int addr, int value)
 }
 
 /* Turns ON or OFF a single bit of the remote device */
-int modbus_write_bit(modbus_t *ctx, int addr, int status)
+int modbus_write_bit(modbus_t *ctx, int slave, int addr, int status)
 {
     if (ctx == NULL) {
         errno = EINVAL;
         return -1;
     }
 
-    return write_single(ctx, MODBUS_FC_WRITE_SINGLE_COIL, addr,
+    return write_single(ctx, MODBUS_FC_WRITE_SINGLE_COIL, slave, addr,
                         status ? 0xFF00 : 0);
 }
 
 /* Writes a value in one register of the remote device */
-int modbus_write_register(modbus_t *ctx, int addr, int value)
+int modbus_write_register(modbus_t *ctx, int slave, int addr, int value)
 {
     if (ctx == NULL) {
         errno = EINVAL;
         return -1;
     }
 
-    return write_single(ctx, MODBUS_FC_WRITE_SINGLE_REGISTER, addr, value);
+    return write_single(ctx, MODBUS_FC_WRITE_SINGLE_REGISTER, slave, addr,
+                        value);
 }
 
 /* Write the bits of the array in the remote device */
-int modbus_write_bits(modbus_t *ctx, int addr, int nb, const uint8_t *src)
+int modbus_write_bits(modbus_t *ctx, int slave, int addr, int nb, const uint8_t *src)
 {
     int rc;
     int i;
@@ -1379,7 +1400,7 @@ int modbus_write_bits(modbus_t *ctx, int addr, int nb, const uint8_t *src)
 
     req_length = ctx->backend->build_request_basis(ctx,
                                                    MODBUS_FC_WRITE_MULTIPLE_COILS,
-                                                   addr, nb, req);
+                                                   slave, addr, nb, req);
     byte_count = (nb / 8) + ((nb % 8) ? 1 : 0);
     req[req_length++] = byte_count;
 
@@ -1416,7 +1437,8 @@ int modbus_write_bits(modbus_t *ctx, int addr, int nb, const uint8_t *src)
 }
 
 /* Write the values from the array to the registers of the remote device */
-int modbus_write_registers(modbus_t *ctx, int addr, int nb, const uint16_t *src)
+int modbus_write_registers(modbus_t *ctx, int slave, int addr, int nb,
+                           const uint16_t *src)
 {
     int rc;
     int i;
@@ -1441,7 +1463,7 @@ int modbus_write_registers(modbus_t *ctx, int addr, int nb, const uint16_t *src)
 
     req_length = ctx->backend->build_request_basis(ctx,
                                                    MODBUS_FC_WRITE_MULTIPLE_REGISTERS,
-                                                   addr, nb, req);
+                                                   slave, addr, nb, req);
     byte_count = nb * 2;
     req[req_length++] = byte_count;
 
@@ -1464,7 +1486,8 @@ int modbus_write_registers(modbus_t *ctx, int addr, int nb, const uint16_t *src)
     return rc;
 }
 
-int modbus_mask_write_register(modbus_t *ctx, int addr, uint16_t and_mask, uint16_t or_mask)
+int modbus_mask_write_register(modbus_t *ctx, int slave, int addr,
+                               uint16_t and_mask, uint16_t or_mask)
 {
     int rc;
     int req_length;
@@ -1475,7 +1498,7 @@ int modbus_mask_write_register(modbus_t *ctx, int addr, uint16_t and_mask, uint1
 
     req_length = ctx->backend->build_request_basis(ctx,
                                                    MODBUS_FC_MASK_WRITE_REGISTER,
-                                                   addr, 0, req);
+                                                   slave, addr, 0, req);
 
     /* HACKISH, count is not used */
     req_length -= 2;
@@ -1503,6 +1526,7 @@ int modbus_mask_write_register(modbus_t *ctx, int addr, uint16_t and_mask, uint1
 /* Write multiple registers from src array to remote device and read multiple
    registers from remote device to dest array. */
 int modbus_write_and_read_registers(modbus_t *ctx,
+                                    int slave,
                                     int write_addr, int write_nb,
                                     const uint16_t *src,
                                     int read_addr, int read_nb,
@@ -1542,7 +1566,7 @@ int modbus_write_and_read_registers(modbus_t *ctx,
     }
     req_length = ctx->backend->build_request_basis(ctx,
                                                    MODBUS_FC_WRITE_AND_READ_REGISTERS,
-                                                   read_addr, read_nb, req);
+                                                  slave, read_addr, read_nb, req);
 
     req[req_length++] = write_addr >> 8;
     req[req_length++] = write_addr & 0x00ff;
@@ -1581,7 +1605,7 @@ int modbus_write_and_read_registers(modbus_t *ctx,
 
 /* Send a request to get the slave ID of the device (only available in serial
    communication). */
-int modbus_report_slave_id(modbus_t *ctx, int max_dest, uint8_t *dest)
+int modbus_report_slave_id(modbus_t *ctx, int slave, int max_dest, uint8_t *dest)
 {
     int rc;
     int req_length;
@@ -1593,7 +1617,7 @@ int modbus_report_slave_id(modbus_t *ctx, int max_dest, uint8_t *dest)
     }
 
     req_length = ctx->backend->build_request_basis(ctx, MODBUS_FC_REPORT_SLAVE_ID,
-                                                   0, 0, req);
+                                                   slave, 0, 0, req);
 
     /* HACKISH, addr and count are not used */
     req_length -= 4;
@@ -1627,7 +1651,7 @@ int modbus_report_slave_id(modbus_t *ctx, int max_dest, uint8_t *dest)
 void _modbus_init_common(modbus_t *ctx)
 {
     /* Slave and socket are initialized to -1 */
-    ctx->slave = -1;
+    ctx->slaves= NULL;
     ctx->s = -1;
 
     ctx->debug = FALSE;
@@ -1641,14 +1665,32 @@ void _modbus_init_common(modbus_t *ctx)
 }
 
 /* Define the slave number */
-int modbus_set_slave(modbus_t *ctx, int slave)
+int modbus_set_slaves(modbus_t *ctx, modbus_slave_callback slaves,
+                     void* app)
 {
     if (ctx == NULL) {
         errno = EINVAL;
         return -1;
     }
+    ctx->sl_app = app;
+    ctx->slaves = slaves;
+    return 0;
+}
 
-    return ctx->backend->set_slave(ctx, slave);
+static unsigned check_single_slave(void* app, int slave)
+{
+    modbus_t const* ctx = app;
+    return ctx->single_slave_address == slave;
+}
+
+int modbus_set_slave(modbus_t* ctx, int slave)
+{
+    if (ctx == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    ctx->single_slave_address = slave;
+    return modbus_set_slaves(ctx, check_single_slave, ctx);
 }
 
 int modbus_set_error_recovery(modbus_t *ctx,
@@ -1933,3 +1975,12 @@ size_t strlcpy(char *dest, const char *src, size_t dest_size)
     return (s - src - 1); /* count does not include NUL */
 }
 #endif
+
+unsigned slave_is_accaptable(modbus_t *ctx, int slave)
+{
+    if(ctx && ctx->slaves)
+    {
+        return ctx->slaves(ctx->sl_app, slave);
+    }
+    return 0;
+}

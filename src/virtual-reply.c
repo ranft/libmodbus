@@ -1,4 +1,5 @@
 #include "modbus.h"
+#include "virtual-reply.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +17,7 @@ static uint8_t* get_bit_bucket(uint8_t *base, int address, int nb, int offset,
     return base + addr;
 }
 
-static uint8_t* get_discrete_inputs(void* app, int address, int nb,
+static uint8_t* get_discrete_inputs(void* app, int slave, int address, int nb,
                                     modbus_vmap_reason reason)
 {
     (void) reason;
@@ -29,7 +30,7 @@ static uint8_t* get_discrete_inputs(void* app, int address, int nb,
                           mb_mapping->nb_input_bits);
 }
 
-static uint8_t* get_coils(void* app, int address, int nb,
+static uint8_t* get_coils(void* app, int slave, int address, int nb,
                           modbus_vmap_reason reason)
 {
     (void) reason;
@@ -55,7 +56,7 @@ static uint16_t* get_specific_register(uint16_t *base, int address, int nb,
     return base + addr;
 }
 
-static uint16_t* get_register(void* app, int address, int nb,
+static uint16_t* get_register(void* app, int slave, int address, int nb,
                               modbus_vmap_reason reason)
 {
     (void) reason;
@@ -68,7 +69,7 @@ static uint16_t* get_register(void* app, int address, int nb,
                                  mb_mapping->nb_registers);
 }
 
-static uint16_t* get_input_register(void* app, int address, int nb,
+static uint16_t* get_input_register(void* app, int slave, int address, int nb,
                                     modbus_vmap_reason reason)
 {
     (void) reason;

@@ -25,7 +25,7 @@ static uint8_t* get_discrete_inputs(void* app, int address, int nb,
 
     modbus_mapping_t* mb_mapping = app;
     return get_bit_bucket(mb_mapping->tab_input_bits, address, nb,
-                          mb_mapping->offset_input_bits,
+                          mb_mapping->start_input_bits,
                           mb_mapping->nb_input_bits);
 }
 
@@ -38,7 +38,7 @@ static uint8_t* get_coils(void* app, int address, int nb,
 
     modbus_mapping_t* mb_mapping = app;
     return get_bit_bucket(mb_mapping->tab_bits, address, nb,
-                          mb_mapping->offset_bits,
+                          mb_mapping->start_bits,
                           mb_mapping->nb_bits);
 }
 
@@ -64,7 +64,7 @@ static uint16_t* get_register(void* app, int address, int nb,
 
     modbus_mapping_t* mb_mapping = app;
     return get_specific_register(mb_mapping->tab_registers, address, nb,
-                                 mb_mapping->offset_registers,
+                                 mb_mapping->start_registers,
                                  mb_mapping->nb_registers);
 }
 
@@ -77,7 +77,7 @@ static uint16_t* get_input_register(void* app, int address, int nb,
 
     modbus_mapping_t* mb_mapping = app;
     return get_specific_register(mb_mapping->tab_input_registers, address, nb,
-                                 mb_mapping->offset_input_registers,
+                                 mb_mapping->start_input_registers,
                                  mb_mapping->nb_input_registers);
 }
 

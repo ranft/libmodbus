@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <errno.h>
 #include <limits.h>
 #include <time.h>
@@ -684,12 +685,10 @@ static int response_exception(modbus_t *ctx, sft_t *sft,
         modbus_flush(ctx);
     }
 
+    /* Build exception response */
     int rsp_length;
-
     sft->function = sft->function + 0x80;
     rsp_length = ctx->backend->build_response_basis(sft, rsp);
-
-    /* Positive exception code */
     rsp[rsp_length++] = exception_code;
 
     return rsp_length;
@@ -1788,12 +1787,14 @@ int modbus_set_debug(modbus_t *ctx, int flag)
 /* Allocates 4 arrays to store bits, input bits, registers and inputs
    registers. The pointers are stored in modbus_mapping structure.
 
-   The modbus_mapping_offset_new() function shall return the new allocated structure if
-   successful. Otherwise it shall return NULL and set errno to ENOMEM. */
-modbus_mapping_t* modbus_mapping_offset_new(int nb_bits, int offset_bits,
-                                            int nb_input_bits, int offset_input_bits,
-                                            int nb_registers, int offset_registers,
-                                            int nb_input_registers, int offset_input_registers)
+   The modbus_mapping_new_ranges() function shall return the new allocated
+   structure if successful. Otherwise it shall return NULL and set errno to
+   ENOMEM. */
+modbus_mapping_t* modbus_mapping_new_start_address(
+    unsigned int start_bits, unsigned int nb_bits,
+    unsigned int start_input_bits, unsigned int nb_input_bits,
+    unsigned int start_registers, unsigned int nb_registers,
+    unsigned int start_input_registers, unsigned int nb_input_registers)
 {
     modbus_mapping_t *mb_mapping;
 
@@ -1804,7 +1805,7 @@ modbus_mapping_t* modbus_mapping_offset_new(int nb_bits, int offset_bits,
 
     /* 0X */
     mb_mapping->nb_bits = nb_bits;
-    mb_mapping->offset_bits = offset_bits;
+    mb_mapping->start_bits = start_bits;
     if (nb_bits == 0) {
         mb_mapping->tab_bits = NULL;
     } else {
@@ -1820,7 +1821,7 @@ modbus_mapping_t* modbus_mapping_offset_new(int nb_bits, int offset_bits,
 
     /* 1X */
     mb_mapping->nb_input_bits = nb_input_bits;
-    mb_mapping->offset_input_bits = offset_input_bits;
+    mb_mapping->start_input_bits = start_input_bits;
     if (nb_input_bits == 0) {
         mb_mapping->tab_input_bits = NULL;
     } else {
@@ -1836,7 +1837,7 @@ modbus_mapping_t* modbus_mapping_offset_new(int nb_bits, int offset_bits,
 
     /* 4X */
     mb_mapping->nb_registers = nb_registers;
-    mb_mapping->offset_registers = offset_registers;
+    mb_mapping->start_registers = start_registers;
     if (nb_registers == 0) {
         mb_mapping->tab_registers = NULL;
     } else {
@@ -1853,7 +1854,7 @@ modbus_mapping_t* modbus_mapping_offset_new(int nb_bits, int offset_bits,
 
     /* 3X */
     mb_mapping->nb_input_registers = nb_input_registers;
-    mb_mapping->offset_input_registers = offset_input_registers;
+    mb_mapping->start_input_registers = start_input_registers;
     if (nb_input_registers == 0) {
         mb_mapping->tab_input_registers = NULL;
     } else {
@@ -1876,7 +1877,8 @@ modbus_mapping_t* modbus_mapping_offset_new(int nb_bits, int offset_bits,
 modbus_mapping_t* modbus_mapping_new(int nb_bits, int nb_input_bits,
                                      int nb_registers, int nb_input_registers)
 {
-    return modbus_mapping_offset_new(nb_bits, 0, nb_input_bits, 0, nb_registers, 0, nb_input_registers, 0);
+    return modbus_mapping_new_start_address(
+        0, nb_bits, 0, nb_input_bits, 0, nb_registers, 0, nb_input_registers);
 }
 
 /* Frees the 4 arrays */
